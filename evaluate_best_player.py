@@ -80,17 +80,19 @@ def evaluate_best_player():
     # PV MCTSで行動選択を行う関数の生成
     next_pv_mcts_action = pv_mcts_action(model, 0.0)
 
-    # VSランダム
+    # VSランダム（Ultimate Tic-Tac-Toeでは十分な指標）
     next_actions = (next_pv_mcts_action, random_action)
     evaluate_algorithm_of('VS_Random', next_actions)
 
+    # 注意: Ultimate Tic-Tac-Toeではアルファベータ法とMCTSは
+    # 探索空間が大きすぎて実用的ではないため、評価から除外
     # VSアルファベータ法
-    next_actions = (next_pv_mcts_action, alpha_beta_action)
-    evaluate_algorithm_of('VS_AlphaBeta', next_actions)
+    # next_actions = (next_pv_mcts_action, alpha_beta_action)
+    # evaluate_algorithm_of('VS_AlphaBeta', next_actions)
 
     # VSモンテカルロ木探索
-    next_actions = (next_pv_mcts_action, mcts_action)
-    evaluate_algorithm_of('VS_MCTS', next_actions)
+    # next_actions = (next_pv_mcts_action, mcts_action)
+    # evaluate_algorithm_of('VS_MCTS', next_actions)
 
     # モデルの破棄
     del model

@@ -9,10 +9,10 @@ from dual_network import dual_network
 try:
     import uttt_cpp
     from self_play_cpp import self_play
-    print("🚀 Using C++ backend for maximum speed!")
+    print(">> Using C++ backend for maximum speed!")
 except ImportError:
     from self_play_hybrid import self_play_hybrid as self_play
-    print("⚡ Using hybrid backend (C++ game logic + Python MCTS)")
+    print(">> Using hybrid backend (C++ game logic + Python MCTS)")
 
 from train_network import train_network
 from evaluate_network import evaluate_network
@@ -25,9 +25,10 @@ if __name__ == '__main__':
     for i in range(10):
         print('Train',i,'====================')
         # セルフプレイ部（C++バックエンド自動選択）
-        self_play(use_cpp=True)
-
-        # パラメータ更新部
+        self_play()
+        
+        # パラメータ更新部分
+        print(f'>> Train {i}')
         train_network()
 
         # 新パラメータ評価部

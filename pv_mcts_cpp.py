@@ -140,7 +140,7 @@ def pv_mcts_action_cpp(model, temperature=0, evaluate_count=50, batch_size=8):
 def check_cpp_compatibility():
     """C++モジュールが正しくインストールされているか確認"""
     if not CPP_AVAILABLE:
-        print("❌ C++ module is NOT available")
+        print("XX C++ module is NOT available")
         print("   Please run: cd cpp && pip install -e .")
         return False
     
@@ -163,7 +163,7 @@ def check_cpp_compatibility():
         
         return True
     except Exception as e:
-        print(f"❌ C++ module test failed: {e}")
+        print(f"XX C++ module test failed: {e}")
         return False
 
 if __name__ == '__main__':
