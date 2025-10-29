@@ -1,0 +1,13 @@
+# PyTorch with CUDA 12.1
+--index-url https://download.pytorch.org/whl/cu121
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+
+# Core dependencies
+numpy>=1.20.0
+pybind11>=2.10.0
+
+# Optional for development
+jupyter>=1.0.0
+matplotlib>=3.5.0

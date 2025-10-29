@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools", "wheel", "pybind11>=2.10.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uttt_cpp"
+version = "0.1.0"
+description = "C++ implementation of Ultimate Tic-Tac-Toe game and MCTS"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20.0",
+]
+
+[tool.setuptools]
+packages = []
