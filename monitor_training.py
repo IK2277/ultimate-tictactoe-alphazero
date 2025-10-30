@@ -3,6 +3,8 @@
 TensorBoard風のシンプルな可視化
 """
 
+import matplotlib
+matplotlib.use('TkAgg')  # Windowsでグラフを表示するため
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
@@ -42,31 +44,30 @@ class TrainingMonitor:
         if not Path(self.log_file).exists():
             return []
         
-        # Windows PowerShellのTee-ObjectはUTF-16 LEを使用
-        try:
-            with open(self.log_file, 'r', encoding='utf-16-le') as f:
-                f.seek(self.last_position)
-                new_lines = f.readlines()
-                self.last_position = f.tell()
-            return new_lines
-        except UnicodeDecodeError:
-            # UTF-8でも試す
+        # エンコーディングの自動検出
+        encodings = ['utf-8', 'utf-16-le', 'cp932']
+        
+        for encoding in encodings:
             try:
-                with open(self.log_file, 'r', encoding='utf-8') as f:
+                with open(self.log_file, 'r', encoding=encoding, errors='ignore') as f:
                     f.seek(self.last_position)
                     new_lines = f.readlines()
                     self.last_position = f.tell()
                 return new_lines
-            except:
-                return []
+            except (UnicodeDecodeError, IOError):
+                continue
+        
+        # すべて失敗した場合
+        return []
     
     def parse_lines(self, lines):
         """
         新しい行からデータを抽出
         """
         for line in lines:
-            # エポックと損失
-            epoch_match = re.search(r'Epoch (\d+)/\d+, Loss: ([\d.]+), LR: ([\d.]+)', line)
+            # エポックと損失（新しい形式に対応）
+            # 形式: "Epoch 1/100, Loss: 3.4748, LR: 0.001000"
+            epoch_match = re.search(r'Epoch (\d+)/\d+, Loss: ([\d.]+), LR: ([\d.e-]+)', line)
             if epoch_match:
                 epoch = int(epoch_match.group(1))
                 loss = float(epoch_match.group(2))
@@ -77,15 +78,19 @@ class TrainingMonitor:
                 self.losses.append(loss)
                 self.lrs.append(lr)
             
-            # 評価スコア
-            eval_match = re.search(r'AveragePoint ([\d.]+)', line)
+            # 評価スコア（新しい形式に対応）
+            # 形式: "AveragePoint 0.54" または "Average Score: 0.54"
+            eval_match = re.search(r'(?:AveragePoint|Average[:\s]+(?:Score)?)[:\s]+([\d.]+)', line)
             if eval_match:
                 score = float(eval_match.group(1))
-                self.eval_scores.append(score)
-                self.cycles.append(len(self.eval_scores))
+                # スコアが0-1の範囲にあることを確認
+                if 0 <= score <= 1:
+                    self.eval_scores.append(score)
+                    self.cycles.append(len(self.eval_scores))
             
-            # サイクル開始
-            cycle_match = re.search(r'Train (\d+) =', line)
+            # サイクル開始（新しい形式に対応）
+            # 形式: "Train 0 ====" または "Train 0"
+            cycle_match = re.search(r'Train (\d+)', line)
             if cycle_match:
                 cycle_num = int(cycle_match.group(1))
                 print(f">> Cycle {cycle_num} started")
@@ -221,9 +226,10 @@ def main():
         print(f"XX Log file '{log_file}' not found")
         print("\n>> Usage:")
         print("   1. Start training in another terminal:")
-        print("      python train_cycle.py | Tee-Object -FilePath training_log.txt")
+        print("      python -u train_cycle.py *>&1 | Tee-Object -FilePath training_log.txt")
         print("   2. Run this script:")
         print("      python monitor_training.py")
+        print("\n>> Note: Make sure training_log.txt exists before starting the monitor")
         return
     
     # モニターを開始
