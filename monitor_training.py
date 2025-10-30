@@ -27,9 +27,15 @@ class TrainingMonitor:
         self.lrs = deque(maxlen=max_points)
         self.eval_scores = []
         self.cycles = []
+        # セルフプレイ進捗
+        self.total_games = None
+        self.games_per_worker = None
+        self.worker_progress = {}
+        self.selfplay_progress = 0.0
         
         # ファイルの最後の位置
         self.last_position = 0
+        self.last_mtime = 0
         
         # グラフの初期化
         plt.style.use('seaborn-v0_8-darkgrid')
@@ -46,6 +52,15 @@ class TrainingMonitor:
         
         # エンコーディングの自動検出
         encodings = ['utf-8', 'utf-16-le', 'cp932']
+        p = Path(self.log_file)
+        try:
+            stat = p.stat()
+            # ファイルがローテーション/短縮された場合に先頭から読み直す
+            if stat.st_size < self.last_position:
+                self.last_position = 0
+            self.last_mtime = stat.st_mtime
+        except Exception:
+            pass
         
         for encoding in encodings:
             try:
@@ -94,6 +109,27 @@ class TrainingMonitor:
             if cycle_match:
                 cycle_num = int(cycle_match.group(1))
                 print(f">> Cycle {cycle_num} started")
+
+            # セルフプレイ総ゲーム数
+            # 形式: ">> Total games: 500, Games per worker: 62"
+            games_info = re.search(r'Total games:\s*(\d+),\s*Games per worker:\s*(\d+)', line)
+            if games_info:
+                self.total_games = int(games_info.group(1))
+                self.games_per_worker = int(games_info.group(2))
+
+            # ワーカー進捗
+            # 形式: "Worker 3: 20/62 games completed"
+            worker_prog = re.search(r'Worker\s+(\d+):\s+(\d+)/(\d+)\s+games completed', line)
+            if worker_prog:
+                wid = int(worker_prog.group(1))
+                done = int(worker_prog.group(2))
+                total = int(worker_prog.group(3))
+                self.worker_progress[wid] = (done, total)
+                # 全体進捗の推定
+                total_done = sum(d for d, t in self.worker_progress.values())
+                total_all = sum(t for d, t in self.worker_progress.values())
+                if total_all > 0:
+                    self.selfplay_progress = total_done / total_all
     
     def update_plots(self, frame):
         """
@@ -179,6 +215,19 @@ class TrainingMonitor:
                 stats_text += f">> Loss Improvement: {improvement:.4f}\n"
         
         stats_text += "\n"
+        # セルフプレイ進捗
+        if self.worker_progress:
+            stats_text += ">> Self-play Progress:\n"
+            stats_text += f"   Overall: {self.selfplay_progress*100:.1f}%\n"
+            # 最大3ワーカーまで詳細表示
+            shown = 0
+            for wid in sorted(self.worker_progress.keys()):
+                d, t = self.worker_progress[wid]
+                stats_text += f"   Worker {wid}: {d}/{t}\n"
+                shown += 1
+                if shown >= 3:
+                    break
+            stats_text += "\n"
         
         if self.eval_scores:
             stats_text += f">> Cycles Completed: {len(self.eval_scores)}\n"
@@ -188,6 +237,8 @@ class TrainingMonitor:
         
         stats_text += "\n"
         stats_text += f">> Last Update: {time.strftime('%H:%M:%S')}\n"
+        if self.last_mtime:
+            stats_text += f">> Log mtime: {time.strftime('%H:%M:%S', time.localtime(self.last_mtime))}\n"
         
         ax4.text(0.1, 0.9, stats_text, transform=ax4.transAxes,
                 fontsize=11, verticalalignment='top', fontfamily='monospace',
@@ -199,13 +250,13 @@ class TrainingMonitor:
         """
         モニタリングを開始
         """
-        print(">> Starting real-time training monitor...")
-        print(f">> Monitoring: {self.log_file}")
-        print(">> Press Ctrl+C to stop")
+        print(">> Starting real-time training monitor...", flush=True)
+        print(f">> Monitoring: {self.log_file}", flush=True)
+        print(">> Press Ctrl+C to stop", flush=True)
         print()
         
         # アニメーションを開始（2秒ごとに更新）
-        ani = FuncAnimation(self.fig, self.update_plots, 
+        self.ani = FuncAnimation(self.fig, self.update_plots, 
                           interval=2000, cache_frame_data=False)
         plt.show()
 
