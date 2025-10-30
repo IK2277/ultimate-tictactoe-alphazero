@@ -7,14 +7,27 @@ from dual_network import dual_network
 import json
 from pathlib import Path
 
-# C++バックエンドの利用可能性をチェック
-try:
-    import uttt_cpp
-    from self_play_cpp import self_play
-    print(">> Using C++ backend for maximum speed!")
-except ImportError:
-    from self_play_hybrid import self_play_hybrid as self_play
-    print(">> Using hybrid backend (C++ game logic + Python MCTS)")
+# セルフプレイの実装を選択
+# 並列版を使用するかシリアル版を使用するか
+USE_PARALLEL = True  # 高速化のため並列版を使用
+
+if USE_PARALLEL:
+    try:
+        import uttt_cpp
+        from self_play_parallel import self_play_parallel as self_play
+        print(">> Using parallel C++ backend for maximum speed!")
+    except ImportError:
+        from self_play_parallel import self_play_parallel as self_play
+        print(">> Using parallel Python backend (slower)")
+else:
+    # シリアル版（従来版）
+    try:
+        import uttt_cpp
+        from self_play_cpp import self_play
+        print(">> Using C++ backend (serial)")
+    except ImportError:
+        from self_play_hybrid import self_play_hybrid as self_play
+        print(">> Using hybrid backend (C++ game logic + Python MCTS)")
 
 from train_network import train_network, get_dynamic_learning_rate
 from evaluate_network import evaluate_network
