@@ -1,83 +1,75 @@
-# Ultimate Tic-Tac-Toe AlphaZero
+﻿# Ultimate Tic-Tac-Toe AlphaZero (ver2.0)
 
-AlphaZeroアルゴリズムを使用したUltimate Tic-Tac-Toeの強化学習実装（PyTorch + C++最適化版）
-
-## 📋 目次
-
-- [概要](#概要)
-- [主な特徴](#主な特徴)
-- [システム要件](#システム要件)
-- [クイックスタート](#クイックスタート)
-- [トレーニング](#トレーニング)
-- [パフォーマンス設定](#パフォーマンス設定)
-- [ファイル構成](#ファイル構成)
-- [トラブルシューティング](#トラブルシューティング)
-- [技術詳細](#技術詳細)
+AlphaZeroアルゴリズムを使用したUltimate Tic-Tac-Toeの強化学習実装  
+**PyTorch + C++最適化 + 並列処理 + リアルタイム可視化**
 
 ---
 
-## 概要
+##  主な特徴
 
-AlphaZeroスタイルの自己対戦型強化学習を用いて、Ultimate Tic-Tac-Toe（究極の三目並べ）をプレイするAIを訓練します。
-
-### 主な特徴
-
-- ✅ **ResNetベースのDual Network** (Policy + Value Head、1.2M parameters)
-- ✅ **Monte Carlo Tree Search (MCTS)** による探索
-- ✅ **C++実装による高速化** (ゲームロジック20x、MCTS 50x高速)
-- ✅ **マルチプロセス並列化** (8ワーカー、5-6倍高速)
-- ✅ **GPU対応** (NVIDIA CUDA 12.1+、PyTorch最適化)
-- ✅ **動的パラメータ調整** (MCTS探索回数、学習率、ゲーム数)
-- ✅ **リアルタイム訓練監視** (matplotlib可視化)
-- ✅ **チェックポイント機能** (いつでも中断・再開可能)
+-  **ResNetベースのDual Network** (Policy + Value Head, 1.2M parameters)
+-  **Monte Carlo Tree Search (MCTS)** による探索
+-  **C++実装による高速化** (ゲームロジック30-50倍高速)
+-  **マルチプロセス並列化** (8ワーカー, 5-6倍高速)
+-  **GPU対応** (NVIDIA CUDA 12.1+, TF32cuDNN最適化)
+-  **動的パラメータ調整** (MCTS探索回数, 学習率, ゲーム数)
+-  **リアルタイム可視化** (損失評価スコアのグラフ表示)
+-  **チェックポイント機能** (いつでも中断再開可能)
 
 ---
 
-## システム要件
+##  システム要件
 
-### ソフトウェア
+### 必須環境
+- **Python**: 3.11以降
+- **OS**: Windows 10/11 (PowerShell)
+- **ストレージ**: 2GB以上の空き容量
 
-- **Python** 3.11以降
-- **CUDA** 12.1以降 (GPU使用時、推奨)
-- **Visual Studio 2019以降** (Windows、C++拡張ビルド用)
-- **Git** (バージョン管理)
-
-### ハードウェア（推奨）
-
+### 推奨環境
 - **GPU**: NVIDIA GeForce RTX 4070 Ti以上 (12GB VRAM)
-- **CPU**: 12コア以上
+- **CUDA**: 12.1以降
+- **CPU**: 12コア以上 (並列処理用)
 - **メモリ**: 32GB以上
-- **ストレージ**: 5GB以上の空き容量
+- **Visual Studio**: 2019以降 (C++拡張ビルド用)
 
 ---
 
-## クイックスタート
+##  クイックスタート
 
-### 1. 自動セットアップ（Windows推奨）
+### 1. 環境構築
 
 ```powershell
-# PowerShellで実行
+# 自動セットアップスクリプト実行
 .\setup.ps1
 ```
 
 このスクリプトは以下を自動実行します：
 - CUDA対応PyTorchのインストール
-- 必要なパッケージのインストール
+- 依存パッケージのインストール
 - C++拡張のビルド
 - GPUの動作確認
-- 初期モデルの作成
 
 ### 2. トレーニング開始
 
-```powershell
-# 並列トレーニング（8ワーカー、推奨）
-python -u train_cycle.py *>&1 | Tee-Object -FilePath training_log.txt
+#### 方法1: リアルタイム可視化あり（推奨）
 
-# リアルタイムモニタリング（別ターミナル）
-python monitor_training.py
+**ターミナル1: トレーニング実行**
+```powershell
+python train_with_log.py
 ```
 
-### 3. 人間vs AI対戦
+**ターミナル2: グラフ表示**
+```powershell
+python monitor_simple.py
+```
+
+#### 方法2: シンプル実行
+
+```powershell
+python train_cycle.py
+```
+
+### 3. 人間 vs AI 対戦
 
 ```powershell
 python human_play.py
@@ -85,352 +77,306 @@ python human_play.py
 
 ---
 
-## トレーニング
+##  トレーニングの仕組み
 
-### 基本コマンド
+### 学習サイクル
 
-```powershell
-# トレーニング開始（ログ出力付き）
-python -u train_cycle.py *>&1 | Tee-Object -FilePath training_log.txt
+```
+Train 0 ====================================
+  
+ 自己対戦（500ゲーム, 8ワーカー並列）
+  
+ 学習（100エポック）
+  
+ 評価（100試合, 最新 vs ベスト）
+  
+ モデル更新（勝率に関係なく常に更新）
+  
+Train 1 ====================================
 ```
 
-### 動的パラメータ
+### 動的パラメータ調整
 
-トレーニングは自動的にパラメータを調整します：
+トレーニングの進行に応じて自動調整：
 
-| サイクル | ゲーム数 | MCTS探索 | 学習率 | 推定時間/サイクル |
-|---------|---------|----------|--------|------------------|
-| 0-9 | 500 | 100 | 0.001 | 約1分 |
-| 10-19 | 1000 | 200 | 0.0005 | 約4分 |
-| 20-29 | 1500 | 400 | 0.0002 | 約11分 |
-| 30+ | 2000 | 800 | 0.0001 | 約29分 |
+| サイクル | ゲーム数 | MCTS探索回数 | 学習率 |
+|---------|---------|-------------|--------|
+| 0-9     | 500     | 100         | 0.001  |
+| 10-19   | 1000    | 200         | 0.0005 |
+| 20-29   | 1500    | 400         | 0.0002 |
+| 30+     | 2000    | 800         | 0.0001 |
 
-**50サイクルの総時間**: 約17時間（8ワーカー）
+---
 
-### 中断と再開
+##  リアルタイム可視化
 
-- **中断**: `Ctrl+C` で安全に停止
-- **再開**: 再度 `python train_cycle.py` で自動的にチェックポイントから再開
+### グラフ表示内容
+
+- **左側**: 損失（Loss）の推移
+- **右側**: 評価スコア（Win Rate）
+
+### 更新頻度
+- 1秒ごとに自動更新
+- 最新の値を表示
+- Ctrl+C で終了すると `training_progress.png` に保存
 
 ### 進捗確認
 
-```powershell
-# リアルタイムモニタリング
-python monitor_training.py
+ターミナルに以下のような出力が表示されます：
 
-# トレーニング後の可視化
-python visualize_training.py
+```
+==================================================
+シンプル学習モニター
+==================================================
+ログファイル: training.log
+Ctrl+C で終了
+
+更新回数: 10, 損失数: 50, 評価数: 0
+更新回数: 20, 損失数: 100, 評価数: 1
 ```
 
 ---
 
-## パフォーマンス設定
+##  パフォーマンス設定
 
-### ワーカー数の設定
+### 並列ワーカー数の調整
 
-`train_cycle.py`の先頭で設定：
+`train_cycle.py` の設定を変更：
 
 ```python
-# ========================================
-# 並列化設定
-# ========================================
-USE_PARALLEL = True  # 並列化ON/OFF
+# aggressive: 8ワーカー（推奨）
+WORKER_MODE = "aggressive"
 
-# ワーカー数の設定
-WORKER_MODE = "aggressive"  # 推奨（8ワーカー）
-# WORKER_MODE = "auto"      # 保守的（4ワーカー）
-# WORKER_MODE = 10          # 手動指定（10ワーカー）
+# auto: 4-6ワーカー（保守的）
+WORKER_MODE = "auto"
+
+# 手動指定
+WORKER_MODE = 6
 ```
 
-### パフォーマンス比較
+### GPU最適化
 
-| 設定 | ワーカー数 | Cycle 0-9 | 50サイクル | 高速化 |
-|------|-----------|-----------|-----------|--------|
-| シリアル | 1 | 3.6分 | 93時間 | 1.0x |
-| 保守的 | 4 | 約1分 | 約26時間 | 3.6x |
-| **積極的** | **8** | **約40秒** | **約17時間** | **5.4x** ⭐ |
-| 最大 | 10 | 約35秒 | 約15時間 | 6.2x |
-
-### システムリソース確認
-
-```powershell
-python auto_tune.py
-```
-
-出力例：
-```
-=== System Resources ===
-CPU Cores: 12 physical, 20 logical
-RAM: 31.8GB total, 16.3GB available
-GPU: NVIDIA GeForce RTX 4070 Ti
-VRAM: 12.0GB total
-
->> Recommended settings:
-   MCTS Batch Size: 32
-   Parallel Workers (Conservative): 4
-   Parallel Workers (Aggressive): 8
-```
+自動的に有効化される最適化：
+-  **TF32**: Tensor Float 32（NVIDIA Ampere以降）
+-  **cuDNN benchmark**: 最適な畳み込みアルゴリズム自動選択
+-  **MCTS バッチサイズ**: 32（GPU効率向上）
 
 ---
 
-## ファイル構成
+##  ファイル構成
 
 ### コアファイル
 
 ```
-train_cycle.py           # メイントレーニングループ
-dual_network.py          # ニューラルネットワーク定義
-game.py                  # Ultimate Tic-Tac-Toeゲームロジック
-pv_mcts.py              # MCTS実装（Python）
-pv_mcts_cpp.py          # MCTS実装（C++ラッパー）
-self_play_cpp.py        # セルフプレイ（C++バックエンド）
-self_play_parallel.py   # セルフプレイ（並列版）
-train_network.py        # ネットワークトレーニング
-evaluate_network.py     # ネットワーク評価
-evaluate_best_player.py # ベストプレイヤー評価
-```
+train_cycle.py           # メインの学習ループ
+train_with_log.py        # ログ付き学習実行ラッパー
+monitor_simple.py        # リアルタイム可視化ツール
 
-### ツール
+dual_network.py          # ResNetベースのニューラルネットワーク
+train_network.py         # ネットワークの訓練
+evaluate_network.py      # モデル評価（100試合）
 
-```
-auto_tune.py            # システムリソース自動調整
-optimize_inference.py   # PyTorch推論最適化
-compare_workers.py      # ワーカー数比較ベンチマーク
-test_speed.py          # 速度テスト
-monitor_training.py    # リアルタイム進捗監視
-visualize_training.py  # トレーニング結果可視化
-human_play.py          # 人間vs AI対戦
-check_gpu.py           # GPU動作確認
+self_play_parallel.py    # 並列自己対戦（8ワーカー）
+pv_mcts.py              # Python版MCTS
+pv_mcts_cpp.py          # C++版MCTS（高速）
+
+game.py                 # ゲームロジック
+human_play.py           # 人間対戦モード
 ```
 
 ### C++拡張
 
 ```
 cpp/
-  uttt_game.cpp/h      # ゲームロジック（C++）
-  uttt_mcts.cpp/h      # MCTS実装（C++）
-  python_bindings.cpp  # Pythonバインディング
-  setup.py             # ビルドスクリプト
-build_cpp.ps1          # C++拡張ビルドスクリプト
+  uttt_game.cpp         # ゲームロジック（C++）
+  uttt_mcts.cpp         # MCTS実装（C++）
+  python_bindings.cpp   # Python連携
 ```
 
-### データ・モデル
+### 設定ユーティリティ
+
+```
+auto_tune.py            # システムリソース自動検出
+optimize_inference.py   # PyTorch最適化設定
+setup.ps1              # 自動セットアップスクリプト
+requirements.txt       # 依存パッケージ
+```
+
+### データモデル
 
 ```
 model/
-  best.pth             # ベストモデル（PyTorch）
+  best.pth             # ベストモデル
+  latest.pth           # 最新モデル
+
 data/
-  *.history            # トレーニングデータ
-training_checkpoint.json  # チェックポイント
-training_log.txt          # トレーニングログ
-training_progress.png     # 進捗グラフ
+  *.history            # 自己対戦データ
+
+training.log           # トレーニングログ
+training_progress.png  # グラフ画像（終了時）
 ```
 
 ---
 
-## トラブルシューティング
+##  トラブルシューティング
 
-### GPU関連
+### GPU が認識されない
 
-**問題**: CUDA Out of Memory
-```python
-# train_cycle.py または self_play_parallel.py で調整
-WORKER_MODE = 4  # ワーカー数を減らす
-
-# または MCTS_BATCH_SIZE を減らす（self_play_parallel.py）
-MCTS_BATCH_SIZE = 16  # 32から16に
-```
-
-**問題**: GPUが認識されない
 ```powershell
-python check_gpu.py  # GPU確認
-# CUDA 12.1+ がインストールされているか確認
+# GPU確認
+python check_gpu.py
+
+# CUDA対応PyTorchを再インストール
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
-
-### メモリ不足
-
-**問題**: メモリ不足エラー
-```python
-# ワーカー数を減らす
-WORKER_MODE = "auto"  # 4ワーカー
-
-# またはシリアル版を使用
-USE_PARALLEL = False
-```
-
-### プロセス起動エラー（Windows）
-
-**問題**: マルチプロセスエラー
-- `if __name__ == '__main__':` ブロック内でコードを実行
-- `mp.freeze_support()` が呼ばれているか確認
-
-### トレーニングが遅い
-
-1. **ワーカー数を増やす**:
-   ```python
-   WORKER_MODE = "aggressive"  # 8ワーカー
-   # または
-   WORKER_MODE = 10  # 10ワーカー
-   ```
-
-2. **システムリソースを確認**:
-   ```powershell
-   python auto_tune.py
-   ```
-
-3. **他のアプリケーションを閉じる**
 
 ### C++拡張のビルドエラー
 
 ```powershell
-# C++拡張を再ビルド
-.\build_cpp.ps1
+# Visual Studio Build Toolsがインストールされているか確認
+# 再ビルド
+cd cpp
+python setup.py build_ext --inplace
 ```
 
-Visual Studio 2019以降がインストールされているか確認してください。
+### 出力がリアルタイムで表示されない
+
+- `train_with_log.py` を使用してください
+- PowerShellのリダイレクト（`>`）はバッファリングされるため非推奨
+
+### メモリ不足エラー
+
+- ワーカー数を減らす: `WORKER_MODE = 4`
+- バッチサイズを減らす（`self_play_parallel.py`内）
 
 ---
 
-## 技術詳細
+##  期待される学習速度
 
-### アーキテクチャ
+### RTX 4070 Ti + 12コアCPU の場合
 
-#### ニューラルネットワーク
-- **タイプ**: ResNet with Dual Head
-- **入力**: 9×9×3 (盤面の状態)
-- **出力**: 
-  - Policy Head: 81次元（各マスの確率）
-  - Value Head: 1次元（勝率予測）
-- **パラメータ数**: 約1.2M
-- **ブロック数**: 16 Residual Blocks
-- **フィルタ数**: 128
+| フェーズ | 時間（サイクルあたり） |
+|---------|----------------------|
+| Cycle 0-9 (500ゲーム) | 約40-60秒 |
+| Cycle 10-19 (1000ゲーム) | 約2-4分 |
+| Cycle 20-29 (1500ゲーム) | 約6-11分 |
+| Cycle 30+ (2000ゲーム) | 約12-20分 |
 
-#### MCTS（Monte Carlo Tree Search）
-- **シミュレーション回数**: 100→800（動的調整）
-- **バッチサイズ**: 32（GPU最適化）
-- **探索戦略**: PUCT（Predictor + Upper Confidence Bound）
-- **温度パラメータ**: 1.0（セルフプレイ時）
+### スピードアップ効果
 
-#### トレーニング
-- **オプティマイザ**: AdamW
-- **学習率**: 0.001→0.0001（動的調整）
-- **バッチサイズ**: 128
-- **エポック数**: 100/サイクル
-- **損失関数**: 
-  - Policy: カスタムクロスエントロピー
-  - Value: MSE
-
-### パフォーマンス最適化
-
-#### C++バックエンド
-- **ゲームロジック**: 20倍高速化
-- **MCTS**: 50倍高速化
-- **言語**: C++17
-- **ライブラリ**: pybind11
-
-#### GPU最適化
-- **TensorFloat-32 (TF32)**: 有効化
-- **cuDNN Benchmark**: 有効化
-- **torch.compile()**: 動的最適化（PyTorch 2.0+）
-
-#### マルチプロセス並列化
-- **方式**: spawn（Windows対応）
-- **ワーカー数**: 4-10（自動調整）
-- **通信**: Queue（IPC）
-
-### 動的パラメータスケーリング
-
-サイクル数に応じて自動調整：
-
-```python
-# MCTS探索回数
-def get_dynamic_pv_count(cycle):
-    if cycle < 10: return 100
-    elif cycle < 20: return 200
-    elif cycle < 30: return 400
-    else: return 800
-
-# 学習率
-def get_dynamic_learning_rate(cycle):
-    if cycle < 10: return 0.001
-    elif cycle < 20: return 0.0005
-    elif cycle < 30: return 0.0002
-    else: return 0.0001
-
-# ゲーム数
-def get_dynamic_game_count(cycle):
-    if cycle < 10: return 500
-    elif cycle < 20: return 1000
-    elif cycle < 30: return 1500
-    else: return 2000
-```
-
-### ベンチマーク結果
-
-#### 実測値（RTX 4070 Ti、12コアCPU、32GB RAM）
-
-**シリアル版（C++）**:
-- 速度: 約2.3ゲーム/秒
-- Cycle 0-9: 約3.6分
-
-**並列版（8ワーカー）**:
-- 速度: 約12ゲーム/秒
-- Cycle 0-9: 約40秒
-- **高速化**: 5.4倍
-
-**総合**:
-- バッチサイズ増加: 1.7倍
-- PyTorch最適化: 1.25倍
-- 並列化: 2.5倍
-- **合計**: 約5倍の高速化
+- **C++ゲームロジック**: 30-50倍高速
+- **8ワーカー並列化**: 5-6倍高速
+- **総合**: ベースライン比 **150-300倍高速**
 
 ---
 
-## ライセンス
+##  ベンチマークテスト
 
-このプロジェクトは教育目的で作成されています。
-
-## 参考文献
-
-- [AlphaZero論文](https://arxiv.org/abs/1712.01815)
-- [AlphaGo Zero論文](https://www.nature.com/articles/nature24270)
-- [PyTorch公式ドキュメント](https://pytorch.org/docs/)
-
-## 謝辞
-
-このプロジェクトは、書籍「AlphaZero 深層学習・強化学習・探索 人工知能プログラミング実践入門」を参考に、Ultimate Tic-Tac-Toeに適用し、PyTorch + C++最適化を施したものです。
-
----
-
-## クイックコマンド一覧
+### 速度テスト
 
 ```powershell
-# セットアップ
-.\setup.ps1
-
-# トレーニング開始
-python -u train_cycle.py *>&1 | Tee-Object -FilePath training_log.txt
-
-# 進捗監視
-python monitor_training.py
-
-# 対戦プレイ
-python human_play.py
-
-# システムリソース確認
-python auto_tune.py
+# 基本速度テスト
+python test_speed.py
 
 # ワーカー数比較
 python compare_workers.py
 
-# GPU確認
-python check_gpu.py
+# 自己対戦ベンチマーク
+python benchmark_selfplay.py
+```
 
-# 可視化
-python visualize_training.py
+### C++実装のテスト
+
+```powershell
+python test_cpp_mcts.py
 ```
 
 ---
 
-**バージョン**: 2.0  
-**最終更新**: 2025年10月30日
+##  技術詳細
+
+### ニューラルネットワーク
+
+- **アーキテクチャ**: ResNet (9x9入力, 9ブロック)
+- **Policy Head**: 81次元出力（全マス）
+- **Value Head**: 1次元出力（勝率予測）
+- **パラメータ数**: 約1.2M
+- **最適化**: Adam optimizer, 動的学習率
+
+### MCTS設定
+
+- **探索回数**: 100-800（動的調整）
+- **バッチサイズ**: 32
+- **温度パラメータ**: 1.0
+- **UCB定数**: 1.0
+
+### 評価方法
+
+- **試合数**: 100試合
+- **対戦相手**: latest vs best
+- **更新ポリシー**: 勝率に関係なく常に更新
+
+---
+
+##  開発履歴（ver2.0の主要変更）
+
+### 最適化
+
+-  8ワーカー並列化（aggressive mode）
+-  C++バックエンド統合
+-  TF32cuDNN最適化
+-  バッファリング問題解決（flush=True）
+
+### 評価システム
+
+-  評価ゲーム数: 50100試合
+-  モデル更新: 常に更新（勝率条件削除）
+
+### 可視化
+
+-  シンプルなリアルタイムモニター追加
+-  ログファイル方式に統一
+-  1秒ごとの高速更新
+
+### その他
+
+-  動的パラメータ調整
+-  チェックポイント機能
+-  ドキュメント整理
+
+---
+
+##  コントリビューション
+
+プルリクエスト歓迎！以下の点にご注意ください：
+
+- コードスタイル: PEP 8準拠
+- コミットメッセージ: 英語推奨
+- テスト: 変更箇所のテスト追加
+
+---
+
+##  ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。
+
+---
+
+##  参考資料
+
+### 論文
+- [Mastering the game of Go without human knowledge](https://www.nature.com/articles/nature24270) (AlphaGo Zero)
+- [A general reinforcement learning algorithm that masters chess, shogi, and Go through self-play](https://www.science.org/doi/10.1126/science.aar6404) (AlphaZero)
+
+### Ultimate Tic-Tac-Toe ルール
+- [Wikipedia - Ultimate Tic-Tac-Toe](https://en.wikipedia.org/wiki/Ultimate_tic-tac-toe)
+
+---
+
+##  お問い合わせ
+
+質問バグ報告は [Issues](https://github.com/IK2277/ultimate-tictactoe-alphazero/issues) へお願いします。
+
+---
+
+**Happy Training! **
