@@ -110,12 +110,11 @@ if __name__ == '__main__':
             print(f'>> Train {i}', flush=True)
             train_network(learning_rate=lr)
 
-            # 新パラメータ評価部
-            update_best_player = evaluate_network()
+            # 新パラメータ評価部（100試合、常にモデル更新）
+            evaluate_network()
 
-            # ベストプレイヤーの評価
-            if update_best_player:
-                evaluate_best_player()
+            # ベストプレイヤーの評価（常に実行）
+            evaluate_best_player()
             
             # チェックポイント保存
             with open(checkpoint_file, 'w') as f:

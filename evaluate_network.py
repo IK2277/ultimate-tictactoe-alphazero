@@ -19,7 +19,7 @@ except ImportError:
     CPP_GAME_AVAILABLE = False
 
 # パラメータの準備
-EN_GAME_COUNT = 50 # 1評価あたりのゲーム数（本家は400）
+EN_GAME_COUNT = 100 # 1評価あたりのゲーム数（50→100に変更）
 EN_TEMPERATURE = 1.0 # ボルツマン分布の温度
 
 # 先手プレイヤーのポイント
@@ -96,12 +96,10 @@ def evaluate_network():
     del model0
     del model1
 
-    # ベストプレイヤーの交代
-    if average_point > 0.5:
-        update_best_player()
-        return True
-    else:
-        return False
+    # ベストプレイヤーの更新（勝率に関係なく常に更新）
+    update_best_player()
+    print('>> Model updated (win rate: {:.1%})'.format(average_point), flush=True)
+    return True
 
 # 動作確認
 if __name__ == '__main__':
