@@ -36,6 +36,7 @@ class TrainingMonitor:
         # ファイルの最後の位置
         self.last_position = 0
         self.last_mtime = 0
+        self.first_read = True  # 初回読み込みフラグ
         
         # グラフの初期化
         plt.style.use('seaborn-v0_8-darkgrid')
@@ -46,6 +47,7 @@ class TrainingMonitor:
     def read_new_lines(self):
         """
         ログファイルから新しい行を読み込む
+        初回はファイル全体を読み込み、2回目以降は追加分のみ
         """
         if not Path(self.log_file).exists():
             return []
@@ -58,6 +60,7 @@ class TrainingMonitor:
             # ファイルがローテーション/短縮された場合に先頭から読み直す
             if stat.st_size < self.last_position:
                 self.last_position = 0
+                self.first_read = True
             self.last_mtime = stat.st_mtime
         except Exception:
             pass
@@ -65,9 +68,17 @@ class TrainingMonitor:
         for encoding in encodings:
             try:
                 with open(self.log_file, 'r', encoding=encoding, errors='ignore') as f:
-                    f.seek(self.last_position)
-                    new_lines = f.readlines()
-                    self.last_position = f.tell()
+                    # 初回は全体を読み込む
+                    if self.first_read:
+                        new_lines = f.readlines()
+                        self.last_position = f.tell()
+                        self.first_read = False
+                        print(f">> Initial read: {len(new_lines)} lines loaded", flush=True)
+                    else:
+                        # 2回目以降は追加分のみ
+                        f.seek(self.last_position)
+                        new_lines = f.readlines()
+                        self.last_position = f.tell()
                 return new_lines
             except (UnicodeDecodeError, IOError):
                 continue
@@ -116,6 +127,7 @@ class TrainingMonitor:
             if games_info:
                 self.total_games = int(games_info.group(1))
                 self.games_per_worker = int(games_info.group(2))
+                print(f">> Detected: Total games={self.total_games}, Per worker={self.games_per_worker}", flush=True)
 
             # ワーカー進捗
             # 形式: "Worker 3: 20/62 games completed"
@@ -216,8 +228,10 @@ class TrainingMonitor:
         
         stats_text += "\n"
         # セルフプレイ進捗
+        stats_text += ">> Self-play Status:\n"
+        if self.total_games:
+            stats_text += f"   Total games: {self.total_games}\n"
         if self.worker_progress:
-            stats_text += ">> Self-play Progress:\n"
             stats_text += f"   Overall: {self.selfplay_progress*100:.1f}%\n"
             # 最大3ワーカーまで詳細表示
             shown = 0
@@ -227,7 +241,9 @@ class TrainingMonitor:
                 shown += 1
                 if shown >= 3:
                     break
-            stats_text += "\n"
+        else:
+            stats_text += "   (waiting for self-play data...)\n"
+        stats_text += "\n"
         
         if self.eval_scores:
             stats_text += f">> Cycles Completed: {len(self.eval_scores)}\n"
