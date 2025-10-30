@@ -4,6 +4,8 @@
 
 # パッケージのインポート
 from dual_network import dual_network
+import json
+from pathlib import Path
 
 # C++バックエンドの利用可能性をチェック
 try:
@@ -22,18 +24,56 @@ if __name__ == '__main__':
     # デュアルネットワークの作成
     dual_network()
 
-    for i in range(10):
-        print('Train',i,'====================')
-        # セルフプレイ部（C++バックエンド自動選択）
-        self_play()
-        
-        # パラメータ更新部分
-        print(f'>> Train {i}')
-        train_network()
+    # チェックポイントファイル
+    checkpoint_file = Path('training_checkpoint.json')
+    
+    # 前回のサイクル番号を読み込み
+    start_cycle = 0
+    if checkpoint_file.exists():
+        try:
+            with open(checkpoint_file, 'r') as f:
+                checkpoint = json.load(f)
+                start_cycle = checkpoint.get('cycle', 0)
+            print(f'>> Resuming from cycle {start_cycle}')
+        except:
+            print('>> Starting from cycle 0')
+    else:
+        print('>> Starting from cycle 0')
+    
+    # 無限ループで学習サイクルを実行
+    i = start_cycle
+    try:
+        while True:
+            print('')
+            print(f'Train {i} ====================================')
+            
+            # セルフプレイ部（C++バックエンド自動選択）
+            self_play()
+            
+            # パラメータ更新部分
+            print(f'>> Train {i}')
+            train_network()
 
-        # 新パラメータ評価部
-        update_best_player = evaluate_network()
+            # 新パラメータ評価部
+            update_best_player = evaluate_network()
 
-        # ベストプレイヤーの評価
-        if update_best_player:
-            evaluate_best_player()
+            # ベストプレイヤーの評価
+            if update_best_player:
+                evaluate_best_player()
+            
+            # チェックポイント保存
+            with open(checkpoint_file, 'w') as f:
+                json.dump({'cycle': i + 1}, f)
+            
+            print(f'>> Cycle {i} completed. Checkpoint saved.')
+            
+            # 次のサイクルへ
+            i += 1
+            
+    except KeyboardInterrupt:
+        print('')
+        print(f'>> Training interrupted at cycle {i}')
+        print(f'>> Progress saved. Resume with: python train_cycle.py')
+        # 現在のサイクル番号を保存
+        with open(checkpoint_file, 'w') as f:
+            json.dump({'cycle': i}, f)
