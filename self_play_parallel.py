@@ -144,12 +144,8 @@ def worker_play_games(model_path, num_games, use_cpp, pv_evaluate_count, worker_
     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model.eval()
     
-    # torch.compile()で最適化（PyTorch 2.0+）
-    try:
-        if hasattr(torch, 'compile'):
-            model = torch.compile(model, mode='reduce-overhead')
-    except:
-        pass  # コンパイル失敗時は通常モデルを使用
+    # torch.compile()はマルチプロセスで問題を起こすため無効化
+    # 代わりに他の最適化（TF32、cuDNN）が有効になっている
     
     history = []
     for i in range(num_games):

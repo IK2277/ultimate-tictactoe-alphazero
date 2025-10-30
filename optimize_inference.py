@@ -39,11 +39,22 @@ def optimize_pytorch():
     
     return True
 
-def compile_model(model):
+def compile_model(model, disable_for_multiprocessing=False):
     """
     PyTorch 2.0+のtorch.compile()を使用してモデルを最適化
     （利用可能な場合）
+    
+    注意: torch.compile()はマルチプロセスで問題を起こす場合があります。
+    並列処理では無効化を推奨します。
+    
+    Args:
+        model: コンパイルするモデル
+        disable_for_multiprocessing: マルチプロセス環境では無効化（推奨: True）
     """
+    if disable_for_multiprocessing:
+        print(">> torch.compile() disabled for multiprocessing safety")
+        return model
+    
     try:
         # PyTorch 2.0以降でtorch.compileが利用可能
         if hasattr(torch, 'compile'):
