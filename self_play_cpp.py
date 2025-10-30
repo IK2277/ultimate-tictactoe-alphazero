@@ -30,6 +30,24 @@ SP_TEMPERATURE = 1.0 # ボルツマン分布の温度パラメータ
 PV_EVALUATE_COUNT = 50
 MCTS_BATCH_SIZE = 8
 
+# 動的なゲーム数を取得する関数
+def get_dynamic_game_count(cycle):
+    """
+    サイクル数に応じてゲーム数を動的に変更
+    cycle 0-9: 500ゲーム (初期学習)
+    cycle 10-19: 1000ゲーム (中期学習)
+    cycle 20-29: 1500ゲーム (後期学習)
+    cycle 30+: 2000ゲーム (微調整)
+    """
+    if cycle < 10:
+        return 500
+    elif cycle < 20:
+        return 1000
+    elif cycle < 30:
+        return 1500
+    else:
+        return 2000
+
 # 1ゲームの実行
 def play(model, use_cpp=True, pv_evaluate_count=None):
     # 探索回数の決定
@@ -105,10 +123,14 @@ def play(model, use_cpp=True, pv_evaluate_count=None):
     return history
 
 # セルフプレイ
-def self_play(use_cpp=True, pv_evaluate_count=None):
+def self_play(use_cpp=True, pv_evaluate_count=None, game_count=None):
     # 探索回数の決定
     if pv_evaluate_count is None:
         pv_evaluate_count = PV_EVALUATE_COUNT
+    
+    # ゲーム数の決定
+    if game_count is None:
+        game_count = SP_GAME_COUNT
     
     # 学習データ
     history = []
@@ -119,14 +141,14 @@ def self_play(use_cpp=True, pv_evaluate_count=None):
     model.eval()
 
     # 複数回のゲーム実行
-    for i in range(SP_GAME_COUNT):
+    for i in range(game_count):
         # 1ゲームの実行
         h = play(model, use_cpp, pv_evaluate_count)
         history.extend(h)
 
         # 出力
         backend = "C++" if (use_cpp and CPP_AVAILABLE) else "Python"
-        print(f'\rSelfPlay {i+1}/{SP_GAME_COUNT} (Backend: {backend}, MCTS: {pv_evaluate_count})', end='')
+        print(f'\rSelfPlay {i+1}/{game_count} (Backend: {backend}, MCTS: {pv_evaluate_count})', end='')
     print('')
 
     # 学習データの保存

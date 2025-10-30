@@ -20,6 +20,7 @@ from train_network import train_network, get_dynamic_learning_rate
 from evaluate_network import evaluate_network
 from evaluate_best_player import evaluate_best_player
 from pv_mcts import get_dynamic_pv_count
+from self_play_cpp import get_dynamic_game_count
 
 if __name__ == '__main__':
     # デュアルネットワークの作成
@@ -51,12 +52,14 @@ if __name__ == '__main__':
             # 動的パラメータの取得
             pv_count = get_dynamic_pv_count(i)
             lr = get_dynamic_learning_rate(i)
+            game_count = get_dynamic_game_count(i)
             
+            print(f'>> Game Count: {game_count}')
             print(f'>> MCTS Simulations: {pv_count}')
             print(f'>> Learning Rate: {lr}')
             
-            # セルフプレイ部（C++バックエンド自動選択、動的探索回数）
-            self_play(pv_evaluate_count=pv_count)
+            # セルフプレイ部（C++バックエンド自動選択、動的パラメータ）
+            self_play(pv_evaluate_count=pv_count, game_count=game_count)
             
             # パラメータ更新部分（動的学習率）
             print(f'>> Train {i}')
