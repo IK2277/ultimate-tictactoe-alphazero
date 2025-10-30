@@ -31,7 +31,11 @@ PV_EVALUATE_COUNT = 50
 MCTS_BATCH_SIZE = 8
 
 # 1ゲームの実行
-def play(model, use_cpp=True):
+def play(model, use_cpp=True, pv_evaluate_count=None):
+    # 探索回数の決定
+    if pv_evaluate_count is None:
+        pv_evaluate_count = PV_EVALUATE_COUNT
+    
     # 学習データ
     history = []
 
@@ -60,9 +64,9 @@ def play(model, use_cpp=True):
 
         # MCTSスコアの取得
         if use_cpp and CPP_AVAILABLE:
-            scores = pv_mcts_scores_cpp(model, state, SP_TEMPERATURE, PV_EVALUATE_COUNT, MCTS_BATCH_SIZE)
+            scores = pv_mcts_scores_cpp(model, state, SP_TEMPERATURE, pv_evaluate_count, MCTS_BATCH_SIZE)
         else:
-            scores = pv_mcts_scores(model, state, SP_TEMPERATURE)
+            scores = pv_mcts_scores(model, state, SP_TEMPERATURE, pv_evaluate_count)
         
         # 合法手を取得
         legal_actions = state.legal_actions()
@@ -101,7 +105,11 @@ def play(model, use_cpp=True):
     return history
 
 # セルフプレイ
-def self_play(use_cpp=True):
+def self_play(use_cpp=True, pv_evaluate_count=None):
+    # 探索回数の決定
+    if pv_evaluate_count is None:
+        pv_evaluate_count = PV_EVALUATE_COUNT
+    
     # 学習データ
     history = []
 
@@ -113,12 +121,12 @@ def self_play(use_cpp=True):
     # 複数回のゲーム実行
     for i in range(SP_GAME_COUNT):
         # 1ゲームの実行
-        h = play(model, use_cpp)
+        h = play(model, use_cpp, pv_evaluate_count)
         history.extend(h)
 
         # 出力
         backend = "C++" if (use_cpp and CPP_AVAILABLE) else "Python"
-        print(f'\rSelfPlay {i+1}/{SP_GAME_COUNT} (Backend: {backend})', end='')
+        print(f'\rSelfPlay {i+1}/{SP_GAME_COUNT} (Backend: {backend}, MCTS: {pv_evaluate_count})', end='')
     print('')
 
     # 学習データの保存
