@@ -19,7 +19,7 @@ except ImportError:
     CPP_GAME_AVAILABLE = False
 
 # パラメータの準備
-EN_GAME_COUNT = 50 # 1評価あたりのゲーム数（本家は400）
+EN_GAME_COUNT = 100 # 1評価あたりのゲーム数（50→100に変更）
 EN_TEMPERATURE = 1.0 # ボルツマン分布の温度
 
 # 先手プレイヤーのポイント
@@ -56,7 +56,7 @@ def play(next_actions):
 # ベストプレイヤーの交代
 def update_best_player():
     copy('./model/latest.pth', './model/best.pth')
-    print('Change BestPlayer')
+    print('Change BestPlayer', flush=True)
 
 # ネットワークの評価
 def evaluate_network():
@@ -85,23 +85,21 @@ def evaluate_network():
             total_point += 1 - play(list(reversed(next_actions)))
 
         # 出力
-        print('\rEvaluate {}/{}'.format(i + 1, EN_GAME_COUNT), end='')
-    print('')
+        print('\rEvaluate {}/{}'.format(i + 1, EN_GAME_COUNT), end='', flush=True)
+    print('', flush=True)
 
     # 平均ポイントの計算
     average_point = total_point / EN_GAME_COUNT
-    print('AveragePoint', average_point)
+    print('AveragePoint', average_point, flush=True)
 
     # モデルの破棄
     del model0
     del model1
 
-    # ベストプレイヤーの交代
-    if average_point > 0.5:
-        update_best_player()
-        return True
-    else:
-        return False
+    # ベストプレイヤーの更新（勝率に関係なく常に更新）
+    update_best_player()
+    print('>> Model updated (win rate: {:.1%})'.format(average_point), flush=True)
+    return True
 
 # 動作確認
 if __name__ == '__main__':

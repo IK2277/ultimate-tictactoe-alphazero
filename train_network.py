@@ -17,6 +17,24 @@ RN_EPOCHS = 100 # 学習回数
 BATCH_SIZE = 128
 NUM_WORKERS = 0  # Windowsではマルチプロセッシングの問題を避けるため0に設定
 
+# 動的な学習率を取得する関数
+def get_dynamic_learning_rate(cycle):
+    """
+    サイクル数に応じて学習率を動的に変更
+    cycle 0-9: 0.001 (初期学習)
+    cycle 10-19: 0.0005 (中期学習)
+    cycle 20-29: 0.0002 (後期学習)
+    cycle 30+: 0.0001 (微調整)
+    """
+    if cycle < 10:
+        return 0.001
+    elif cycle < 20:
+        return 0.0005
+    elif cycle < 30:
+        return 0.0002
+    else:
+        return 0.0001
+
 # 学習データの読み込み
 def load_data():
     history_path = sorted(Path('./data').glob('*.history'))[-1]
@@ -38,7 +56,11 @@ class HistoryDataset(Dataset):
         return self.xs[idx], self.y_policies[idx], self.y_values[idx]
 
 # デュアルネットワークの学習
-def train_network():
+def train_network(learning_rate=None):
+    # 学習率の決定（指定がなければデフォルト値を使用）
+    if learning_rate is None:
+        learning_rate = 0.001
+    
     # 学習データの読み込み
     history = load_data()
     xs, y_policies, y_values = zip(*history)
@@ -72,7 +94,9 @@ def train_network():
         return -torch.sum(target * torch.log(pred + 1e-8)) / pred.size(0)
     
     criterion_value = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    
+    print(f'>> Learning Rate: {learning_rate}', flush=True)
 
     # 学習率スケジューラ
     def lr_lambda(epoch):
@@ -115,11 +139,11 @@ def train_network():
         scheduler.step()
         
         avg_loss = total_loss / len(dataloader)
-        print(f'Epoch {epoch + 1}/{RN_EPOCHS}, Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}')
+        print(f'Epoch {epoch + 1}/{RN_EPOCHS}, Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}', flush=True)
 
     # 最新プレイヤーのモデルの保存
     torch.save(model.state_dict(), './model/latest.pth')
-    print('Model saved to ./model/latest.pth')
+    print('Model saved to ./model/latest.pth', flush=True)
 
     # モデルの破棄
     del model

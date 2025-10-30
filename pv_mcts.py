@@ -10,12 +10,27 @@ from pathlib import Path
 import numpy as np
 import torch
 
-# 高速版を使用
-from self_play_cpp import self_play
-
 # パラメータの準備
 PV_EVALUATE_COUNT = 50 # 1推論あたりのシミュレーション回数（本家は1600）
 MCTS_BATCH_SIZE = 8 # 高速化対応。MCTSの推論バッチサイズ（1〜PV_EVALUATE_COUNT）
+
+# 動的な探索回数を取得する関数
+def get_dynamic_pv_count(cycle):
+    """
+    サイクル数に応じて探索回数を動的に変更
+    cycle 0-9: 100回
+    cycle 10-19: 200回
+    cycle 20-29: 400回
+    cycle 30+: 800回
+    """
+    if cycle < 10:
+        return 100
+    elif cycle < 20:
+        return 200
+    elif cycle < 30:
+        return 400
+    else:
+        return 800
 
 # バッチ推論
 def predict_batch(model, states_batch):
@@ -71,7 +86,10 @@ def nodes_to_scores(nodes):
     return scores
 
 # モンテカルロ木探索のスコアの取得
-def pv_mcts_scores(model, state, temperature):
+def pv_mcts_scores(model, state, temperature, pv_evaluate_count=None):
+    # 探索回数の決定（指定がなければデフォルト値を使用）
+    if pv_evaluate_count is None:
+        pv_evaluate_count = PV_EVALUATE_COUNT
 
     # モンテカルロ木探索のノードの定義
     class Node:
@@ -136,7 +154,7 @@ def pv_mcts_scores(model, state, temperature):
     leaves_to_eval = [] # 評価対象のリーフノード
     paths_to_leaves = [] # そこに至るまでのパス
 
-    for i in range(PV_EVALUATE_COUNT):
+    for i in range(pv_evaluate_count):
         # 1. リーフノードを探索
         path = [] # 探索パス
         leaf, value = root_node.search_leaf(path)
@@ -180,9 +198,9 @@ def pv_mcts_scores(model, state, temperature):
     return scores
 
 # モンテカルロ木探索で行動選択
-def pv_mcts_action(model, temperature=0):
+def pv_mcts_action(model, temperature=0, pv_evaluate_count=None):
     def pv_mcts_action(state):
-        scores = pv_mcts_scores(model, state, temperature)
+        scores = pv_mcts_scores(model, state, temperature, pv_evaluate_count)
         return np.random.choice(state.legal_actions(), p=scores)
     return pv_mcts_action
 

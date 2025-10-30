@@ -1,5 +1,5 @@
 # ====================
-# C++バックエンドを使用した高速セルフプレイ
+# 並列セルフプレイ（マルチプロセス版）
 # ====================
 
 from game import State, state_to_input_tensor
@@ -10,6 +10,8 @@ import numpy as np
 import pickle
 import torch
 import os
+import multiprocessing as mp
+from functools import partial
 
 # C++実装をインポート (利用可能な場合)
 try:
@@ -28,7 +30,13 @@ SP_TEMPERATURE = 1.0 # ボルツマン分布の温度パラメータ
 
 # PV_EVALUATE_COUNTとMCTS_BATCH_SIZEをC++版に合わせる
 PV_EVALUATE_COUNT = 50
-MCTS_BATCH_SIZE = 8
+
+# バッチサイズは自動調整（実行時に決定）
+try:
+    from auto_tune import get_optimal_batch_size
+    MCTS_BATCH_SIZE = get_optimal_batch_size()
+except:
+    MCTS_BATCH_SIZE = 8  # フォールバック
 
 # 動的なゲーム数を取得する関数
 def get_dynamic_game_count(cycle):
@@ -122,8 +130,47 @@ def play(model, use_cpp=True, pv_evaluate_count=None):
 
     return history
 
-# セルフプレイ
-def self_play(use_cpp=True, pv_evaluate_count=None, game_count=None):
+# ワーカープロセスで実行される関数
+def worker_play_games(model_path, num_games, use_cpp, pv_evaluate_count, worker_id):
+    """
+    各ワーカープロセスで複数ゲームを実行
+    """
+    # PyTorchの最適化を有効化
+    from optimize_inference import optimize_pytorch
+    optimize_pytorch()
+    
+    # モデルの読み込み（各プロセスで独立にロード）
+    model = DualNetwork().to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    model.eval()
+    
+    # torch.compile()はマルチプロセスで問題を起こすため無効化
+    # 代わりに他の最適化（TF32、cuDNN）が有効になっている
+    
+    history = []
+    for i in range(num_games):
+        h = play(model, use_cpp, pv_evaluate_count)
+        history.extend(h)
+        
+        # 進捗表示（各ワーカーから）
+        if (i + 1) % 10 == 0:
+            backend = "C++" if (use_cpp and CPP_AVAILABLE) else "Python"
+            print(f'Worker {worker_id}: {i+1}/{num_games} games completed', flush=True)
+    
+    return history
+
+# 並列セルフプレイ
+def self_play_parallel(use_cpp=True, pv_evaluate_count=None, game_count=None, num_workers=None, aggressive=False):
+    """
+    マルチプロセスで並列にセルフプレイを実行
+    
+    Args:
+        use_cpp: C++バックエンドを使用するか
+        pv_evaluate_count: MCTS探索回数
+        game_count: 総ゲーム数
+        num_workers: 並列ワーカー数（Noneの場合は自動決定）
+        aggressive: Trueの場合、より多くのワーカーを使用（実験的）
+    """
     # 探索回数の決定
     if pv_evaluate_count is None:
         pv_evaluate_count = PV_EVALUATE_COUNT
@@ -132,25 +179,54 @@ def self_play(use_cpp=True, pv_evaluate_count=None, game_count=None):
     if game_count is None:
         game_count = SP_GAME_COUNT
     
-    # 学習データ
+    # ワーカー数の決定（自動最適化）
+    # Windowsのプロセス起動コストとIPCオーバーヘッドを考慮
+    if num_workers is None:
+        try:
+            from auto_tune import get_optimal_num_workers
+            num_workers = get_optimal_num_workers(aggressive=aggressive)
+        except:
+            # フォールバック
+            num_workers = 8 if aggressive else 4
+    
+    backend = "C++" if (use_cpp and CPP_AVAILABLE) else "Python"
+    print(f'>> Starting parallel self-play with {num_workers} workers ({backend} backend)', flush=True)
+    print(f'>> Total games: {game_count}, Games per worker: {game_count // num_workers}', flush=True)
+    print(f'>> MCTS batch size: {MCTS_BATCH_SIZE}, PV evaluate count: {pv_evaluate_count}', flush=True)
+    
+    model_path = './model/best.pth'
+    
+    # 各ワーカーが実行するゲーム数を計算
+    games_per_worker = game_count // num_workers
+    remaining_games = game_count % num_workers
+    
+    # マルチプロセスプールで並列実行
+    # Windows対応: spawn方式を明示的に指定
+    ctx = mp.get_context('spawn')
+    with ctx.Pool(processes=num_workers) as pool:
+        # 各ワーカーに割り当てるゲーム数を計算
+        worker_args = []
+        for i in range(num_workers):
+            # 余りのゲームを最初のワーカーに分配
+            worker_games = games_per_worker + (1 if i < remaining_games else 0)
+            worker_args.append((model_path, worker_games, use_cpp, pv_evaluate_count, i + 1))
+        
+        try:
+            # 並列実行
+            results = pool.starmap(worker_play_games, worker_args)
+        except KeyboardInterrupt:
+            print("\n>> Interrupted by user")
+            pool.terminate()
+            pool.join()
+            raise
+    
+    # 全ワーカーの結果を統合
     history = []
-
-    # ベストプレイヤーのモデルの読み込み
-    model = DualNetwork().to(device)
-    model.load_state_dict(torch.load('./model/best.pth', map_location=device, weights_only=True))
-    model.eval()
-
-    # 複数回のゲーム実行
-    for i in range(game_count):
-        # 1ゲームの実行
-        h = play(model, use_cpp, pv_evaluate_count)
-        history.extend(h)
-
-        # 出力
-        backend = "C++" if (use_cpp and CPP_AVAILABLE) else "Python"
-        print(f'\rSelfPlay {i+1}/{game_count} (Backend: {backend}, MCTS: {pv_evaluate_count})', end='')
-    print('')
-
+    for result in results:
+        history.extend(result)
+    
+    print(f'>> Collected {len(history)} training samples from {game_count} games', flush=True)
+    
     # 学習データの保存
     now = datetime.now()
     file_name = './data/{:04}{:02}{:02}{:02}{:02}{:02}.history'.format(
@@ -158,19 +234,25 @@ def self_play(use_cpp=True, pv_evaluate_count=None, game_count=None):
     os.makedirs('./data', exist_ok=True)
     with open(file_name, mode='wb') as f:
         pickle.dump(history, f)
+    
+    print(f'>> Saved to {file_name}', flush=True)
 
 # 動作確認
 if __name__ == '__main__':
+    # Windows対応: freeze_support()を追加
+    mp.freeze_support()
+    
     import os
     
     # C++バックエンドのチェック
     if CPP_AVAILABLE:
         from pv_mcts_cpp import check_cpp_compatibility
         check_cpp_compatibility()
-        print("\nStarting self-play with C++ backend...")
+        print("\nStarting parallel self-play with C++ backend...")
         use_cpp = True
     else:
-        print("\nC++ backend not available. Starting self-play with Python backend...")
+        print("\nC++ backend not available. Starting parallel self-play with Python backend...")
         use_cpp = False
     
-    self_play(use_cpp=use_cpp)
+    # 並列実行
+    self_play_parallel(use_cpp=use_cpp)
