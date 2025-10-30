@@ -164,7 +164,7 @@ def worker_play_games(model_path, num_games, use_cpp, pv_evaluate_count, worker_
     return history
 
 # 並列セルフプレイ
-def self_play_parallel(use_cpp=True, pv_evaluate_count=None, game_count=None, num_workers=None):
+def self_play_parallel(use_cpp=True, pv_evaluate_count=None, game_count=None, num_workers=None, aggressive=False):
     """
     マルチプロセスで並列にセルフプレイを実行
     
@@ -172,7 +172,8 @@ def self_play_parallel(use_cpp=True, pv_evaluate_count=None, game_count=None, nu
         use_cpp: C++バックエンドを使用するか
         pv_evaluate_count: MCTS探索回数
         game_count: 総ゲーム数
-        num_workers: 並列ワーカー数（Noneの場合はCPUコア数-1）
+        num_workers: 並列ワーカー数（Noneの場合は自動決定）
+        aggressive: Trueの場合、より多くのワーカーを使用（実験的）
     """
     # 探索回数の決定
     if pv_evaluate_count is None:
@@ -187,10 +188,10 @@ def self_play_parallel(use_cpp=True, pv_evaluate_count=None, game_count=None, nu
     if num_workers is None:
         try:
             from auto_tune import get_optimal_num_workers
-            num_workers = get_optimal_num_workers()  # 既に調整済み（4-6）
+            num_workers = get_optimal_num_workers(aggressive=aggressive)
         except:
-            # フォールバック: 4ワーカー（安全な値）
-            num_workers = 4
+            # フォールバック
+            num_workers = 8 if aggressive else 4
     
     backend = "C++" if (use_cpp and CPP_AVAILABLE) else "Python"
     print(f'>> Starting parallel self-play with {num_workers} workers ({backend} backend)')

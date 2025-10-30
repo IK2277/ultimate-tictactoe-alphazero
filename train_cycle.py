@@ -7,9 +7,16 @@ from dual_network import dual_network
 import json
 from pathlib import Path
 
-# セルフプレイの実装を選択
-# 並列版を使用するかシリアル版を使用するか
+# ========================================
+# 並列化設定
+# ========================================
 USE_PARALLEL = True  # 高速化のため並列版を使用
+
+# ワーカー数の設定
+# - "auto": 自動設定（保守的: 4-6ワーカー）
+# - "aggressive": 積極的な設定（8-10ワーカー）
+# - 数値: 手動で指定（例: 4, 6, 8, 10）
+WORKER_MODE = "aggressive"  # "auto", "aggressive", または数値
 
 if USE_PARALLEL:
     try:
@@ -71,8 +78,21 @@ if __name__ == '__main__':
             print(f'>> MCTS Simulations: {pv_count}')
             print(f'>> Learning Rate: {lr}')
             
-            # セルフプレイ部（C++バックエンド自動選択、動的パラメータ）
-            self_play(pv_evaluate_count=pv_count, game_count=game_count)
+            # セルフプレイ部（並列化設定に応じて実行）
+            if USE_PARALLEL:
+                # 並列版: ワーカー数を設定
+                if isinstance(WORKER_MODE, int):
+                    # 手動指定
+                    self_play(pv_evaluate_count=pv_count, game_count=game_count, num_workers=WORKER_MODE)
+                elif WORKER_MODE == "aggressive":
+                    # 積極的な設定
+                    self_play(pv_evaluate_count=pv_count, game_count=game_count, aggressive=True)
+                else:
+                    # 自動（保守的）
+                    self_play(pv_evaluate_count=pv_count, game_count=game_count)
+            else:
+                # シリアル版
+                self_play(pv_evaluate_count=pv_count, game_count=game_count)
             
             # パラメータ更新部分（動的学習率）
             print(f'>> Train {i}')
