@@ -202,7 +202,7 @@ setup.ps1              # 自動セットアップスクリプト
 requirements.txt       # 依存パッケージ
 ```
 
-### データモデル
+### データ・モデル
 
 ```
 model/
@@ -212,9 +212,44 @@ model/
 data/
   *.history            # 自己対戦データ
 
-training.log           # トレーニングログ
+training.log           # トレーニングログ（Git管理対象）
 training_progress.png  # グラフ画像（終了時）
 ```
+
+---
+
+##  複数デバイス間での作業
+
+### training.logの共有
+
+`training.log` はGit管理されているため、別のデバイスでも学習状況を確認できます。
+
+#### 別デバイスでの確認方法
+
+```powershell
+# 最新の学習ログを取得
+git pull origin ver2.0
+
+# ログの確認
+Get-Content training.log -Tail 20  # 最新20行を表示
+
+# リアルタイム監視（別デバイスでも可能）
+python monitor_simple.py
+```
+
+#### 学習実行デバイスでの更新
+
+```powershell
+# 定期的にログを共有（例: 10サイクルごと）
+git add training.log
+git commit -m "update: Training log Cycle XX"
+git push origin ver2.0
+```
+
+**メリット:**
+- 複数デバイスで学習状況を同期
+- GitHubで学習履歴を管理
+- 別デバイスからもグラフ表示可能
 
 ---
 
@@ -337,6 +372,11 @@ python test_cpp_mcts.py
 -  シンプルなリアルタイムモニター追加
 -  ログファイル方式に統一
 -  1秒ごとの高速更新
+
+### マルチデバイス対応
+
+-  `training.log` をGit管理対象に追加
+-  複数デバイス間での学習状況共有が可能
 
 ### その他
 
