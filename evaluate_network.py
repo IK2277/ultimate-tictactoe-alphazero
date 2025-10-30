@@ -56,7 +56,7 @@ def play(next_actions):
 # ベストプレイヤーの交代
 def update_best_player():
     copy('./model/latest.pth', './model/best.pth')
-    print('Change BestPlayer')
+    print('Change BestPlayer', flush=True)
 
 # ネットワークの評価
 def evaluate_network():
@@ -85,12 +85,12 @@ def evaluate_network():
             total_point += 1 - play(list(reversed(next_actions)))
 
         # 出力
-        print('\rEvaluate {}/{}'.format(i + 1, EN_GAME_COUNT), end='')
-    print('')
+        print('\rEvaluate {}/{}'.format(i + 1, EN_GAME_COUNT), end='', flush=True)
+    print('', flush=True)
 
     # 平均ポイントの計算
     average_point = total_point / EN_GAME_COUNT
-    print('AveragePoint', average_point)
+    print('AveragePoint', average_point, flush=True)
 
     # モデルの破棄
     del model0

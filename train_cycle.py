@@ -22,19 +22,19 @@ if USE_PARALLEL:
     try:
         import uttt_cpp
         from self_play_parallel import self_play_parallel as self_play
-        print(">> Using parallel C++ backend for maximum speed!")
+        print(">> Using parallel C++ backend for maximum speed!", flush=True)
     except ImportError:
         from self_play_parallel import self_play_parallel as self_play
-        print(">> Using parallel Python backend (slower)")
+        print(">> Using parallel Python backend (slower)", flush=True)
 else:
     # シリアル版（従来版）
     try:
         import uttt_cpp
         from self_play_cpp import self_play
-        print(">> Using C++ backend (serial)")
+        print(">> Using C++ backend (serial)", flush=True)
     except ImportError:
         from self_play_hybrid import self_play_hybrid as self_play
-        print(">> Using hybrid backend (C++ game logic + Python MCTS)")
+        print(">> Using hybrid backend (C++ game logic + Python MCTS)", flush=True)
 
 from train_network import train_network, get_dynamic_learning_rate
 from evaluate_network import evaluate_network
@@ -56,27 +56,27 @@ if __name__ == '__main__':
             with open(checkpoint_file, 'r') as f:
                 checkpoint = json.load(f)
                 start_cycle = checkpoint.get('cycle', 0)
-            print(f'>> Resuming from cycle {start_cycle}')
+            print(f'>> Resuming from cycle {start_cycle}', flush=True)
         except:
-            print('>> Starting from cycle 0')
+            print('>> Starting from cycle 0', flush=True)
     else:
-        print('>> Starting from cycle 0')
+        print('>> Starting from cycle 0', flush=True)
     
     # 無限ループで学習サイクルを実行
     i = start_cycle
     try:
         while True:
-            print('')
-            print(f'Train {i} ====================================')
+            print('', flush=True)
+            print(f'Train {i} ====================================', flush=True)
             
             # 動的パラメータの取得
             pv_count = get_dynamic_pv_count(i)
             lr = get_dynamic_learning_rate(i)
             game_count = get_dynamic_game_count(i)
             
-            print(f'>> Game Count: {game_count}')
-            print(f'>> MCTS Simulations: {pv_count}')
-            print(f'>> Learning Rate: {lr}')
+            print(f'>> Game Count: {game_count}', flush=True)
+            print(f'>> MCTS Simulations: {pv_count}', flush=True)
+            print(f'>> Learning Rate: {lr}', flush=True)
             
             # セルフプレイ部（並列化設定に応じて実行）
             if USE_PARALLEL:
@@ -95,7 +95,7 @@ if __name__ == '__main__':
                 self_play(pv_evaluate_count=pv_count, game_count=game_count)
             
             # パラメータ更新部分（動的学習率）
-            print(f'>> Train {i}')
+            print(f'>> Train {i}', flush=True)
             train_network(learning_rate=lr)
 
             # 新パラメータ評価部
@@ -109,15 +109,15 @@ if __name__ == '__main__':
             with open(checkpoint_file, 'w') as f:
                 json.dump({'cycle': i + 1}, f)
             
-            print(f'>> Cycle {i} completed. Checkpoint saved.')
+            print(f'>> Cycle {i} completed. Checkpoint saved.', flush=True)
             
             # 次のサイクルへ
             i += 1
             
     except KeyboardInterrupt:
-        print('')
-        print(f'>> Training interrupted at cycle {i}')
-        print(f'>> Progress saved. Resume with: python train_cycle.py')
+        print('', flush=True)
+        print(f'>> Training interrupted at cycle {i}', flush=True)
+        print(f'>> Progress saved. Resume with: python train_cycle.py', flush=True)
         # 現在のサイクル番号を保存
         with open(checkpoint_file, 'w') as f:
             json.dump({'cycle': i}, f)

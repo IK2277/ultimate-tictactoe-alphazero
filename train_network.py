@@ -96,7 +96,7 @@ def train_network(learning_rate=None):
     criterion_value = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
-    print(f'>> Learning Rate: {learning_rate}')
+    print(f'>> Learning Rate: {learning_rate}', flush=True)
 
     # 学習率スケジューラ
     def lr_lambda(epoch):
@@ -139,11 +139,11 @@ def train_network(learning_rate=None):
         scheduler.step()
         
         avg_loss = total_loss / len(dataloader)
-        print(f'Epoch {epoch + 1}/{RN_EPOCHS}, Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}')
+        print(f'Epoch {epoch + 1}/{RN_EPOCHS}, Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}', flush=True)
 
     # 最新プレイヤーのモデルの保存
     torch.save(model.state_dict(), './model/latest.pth')
-    print('Model saved to ./model/latest.pth')
+    print('Model saved to ./model/latest.pth', flush=True)
 
     # モデルの破棄
     del model

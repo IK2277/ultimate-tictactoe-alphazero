@@ -155,7 +155,7 @@ def worker_play_games(model_path, num_games, use_cpp, pv_evaluate_count, worker_
         # 進捗表示（各ワーカーから）
         if (i + 1) % 10 == 0:
             backend = "C++" if (use_cpp and CPP_AVAILABLE) else "Python"
-            print(f'Worker {worker_id}: {i+1}/{num_games} games completed')
+            print(f'Worker {worker_id}: {i+1}/{num_games} games completed', flush=True)
     
     return history
 
@@ -190,9 +190,9 @@ def self_play_parallel(use_cpp=True, pv_evaluate_count=None, game_count=None, nu
             num_workers = 8 if aggressive else 4
     
     backend = "C++" if (use_cpp and CPP_AVAILABLE) else "Python"
-    print(f'>> Starting parallel self-play with {num_workers} workers ({backend} backend)')
-    print(f'>> Total games: {game_count}, Games per worker: {game_count // num_workers}')
-    print(f'>> MCTS batch size: {MCTS_BATCH_SIZE}, PV evaluate count: {pv_evaluate_count}')
+    print(f'>> Starting parallel self-play with {num_workers} workers ({backend} backend)', flush=True)
+    print(f'>> Total games: {game_count}, Games per worker: {game_count // num_workers}', flush=True)
+    print(f'>> MCTS batch size: {MCTS_BATCH_SIZE}, PV evaluate count: {pv_evaluate_count}', flush=True)
     
     model_path = './model/best.pth'
     
@@ -225,7 +225,7 @@ def self_play_parallel(use_cpp=True, pv_evaluate_count=None, game_count=None, nu
     for result in results:
         history.extend(result)
     
-    print(f'>> Collected {len(history)} training samples from {game_count} games')
+    print(f'>> Collected {len(history)} training samples from {game_count} games', flush=True)
     
     # 学習データの保存
     now = datetime.now()
@@ -235,7 +235,7 @@ def self_play_parallel(use_cpp=True, pv_evaluate_count=None, game_count=None, nu
     with open(file_name, mode='wb') as f:
         pickle.dump(history, f)
     
-    print(f'>> Saved to {file_name}')
+    print(f'>> Saved to {file_name}', flush=True)
 
 # 動作確認
 if __name__ == '__main__':
