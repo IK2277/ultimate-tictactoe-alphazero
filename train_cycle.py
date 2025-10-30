@@ -6,6 +6,18 @@
 from dual_network import dual_network
 import json
 from pathlib import Path
+import sys
+
+# ログファイルへの出力設定
+LOG_FILE = 'training.log'
+log_file_handle = None
+
+def log_print(message):
+    """画面とログファイルの両方に出力"""
+    print(message, flush=True)
+    if log_file_handle:
+        log_file_handle.write(message + '\n')
+        log_file_handle.flush()
 
 # ========================================
 # 並列化設定

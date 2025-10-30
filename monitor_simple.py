@@ -14,6 +14,7 @@ class SimpleMonitor:
         self.epochs = []
         self.eval_scores = []
         self.cycles = []
+        self.last_size = 0  # ファイルサイズを追跡
         
         # グラフ設定
         plt.ion()  # インタラクティブモード
@@ -23,6 +24,15 @@ class SimpleMonitor:
     def read_log(self):
         """ログファイルを読み込んでデータを抽出"""
         if not Path(self.log_file).exists():
+            return
+        
+        # ファイルサイズをチェック（変更がない場合はスキップ）
+        try:
+            current_size = Path(self.log_file).stat().st_size
+            if current_size == self.last_size:
+                return  # 変更なし
+            self.last_size = current_size
+        except:
             return
         
         try:
@@ -115,11 +125,22 @@ class SimpleMonitor:
         print("Ctrl+C で終了")
         print()
         
+        # 初回読み込み
+        self.read_log()
+        self.update_plot()
+        
         try:
+            update_count = 0
             while True:
                 self.read_log()
                 self.update_plot()
-                time.sleep(2)  # 2秒ごとに更新
+                
+                # 進捗表示
+                update_count += 1
+                if update_count % 10 == 0:
+                    print(f"更新回数: {update_count}, 損失数: {len(self.losses)}, 評価数: {len(self.eval_scores)}", flush=True)
+                
+                time.sleep(1)  # 1秒ごとに更新（より頻繁に）
         except KeyboardInterrupt:
             print("\n\n監視を終了します")
             plt.savefig('training_progress.png', dpi=150, bbox_inches='tight')
