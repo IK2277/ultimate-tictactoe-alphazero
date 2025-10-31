@@ -25,7 +25,9 @@ with open(LOG_FILE, 'a', encoding='utf-8', buffering=1) as log_file:
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,  # 行バッファリング
-            universal_newlines=True
+            universal_newlines=True,
+            encoding='utf-8',
+            errors='replace'  # デコードエラーを無視
         )
         
         # 出力を画面とファイルの両方に表示

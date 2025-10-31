@@ -121,15 +121,15 @@ if __name__ == '__main__':
             # ベストプレイヤーの評価（常に実行）
             evaluate_best_player()
             
-            # 試行回数をインクリメント
-            attempt += 1
-            
             # モデルが更新された場合のみサイクル数をインクリメント
             if model_updated:
                 i += 1
                 print(f'>> ✅ Cycle {i-1} SUCCESS! Model updated. Moving to cycle {i}.', flush=True)
             else:
                 print(f'>> ⚠️ Attempt {attempt}: Model NOT updated. Retrying cycle {i}.', flush=True)
+            
+            # 試行回数をインクリメント（評価後）
+            attempt += 1
             
             # チェックポイント保存（サイクル数と試行回数の両方を保存）
             with open(checkpoint_file, 'w') as f:
