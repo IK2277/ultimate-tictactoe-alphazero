@@ -61,14 +61,16 @@ if __name__ == '__main__':
     # チェックポイントファイル
     checkpoint_file = Path('training_checkpoint.json')
     
-    # 前回のサイクル番号を読み込み
+    # 前回のサイクル番号と試行回数を読み込み
     start_cycle = 0
+    start_attempt = 0
     if checkpoint_file.exists():
         try:
             with open(checkpoint_file, 'r') as f:
                 checkpoint = json.load(f)
                 start_cycle = checkpoint.get('cycle', 0)
-            print(f'>> Resuming from cycle {start_cycle}', flush=True)
+                start_attempt = checkpoint.get('attempt', 0)
+            print(f'>> Resuming from cycle {start_cycle} (attempt {start_attempt})', flush=True)
         except:
             print('>> Starting from cycle 0', flush=True)
     else:
@@ -76,16 +78,19 @@ if __name__ == '__main__':
     
     # 無限ループで学習サイクルを実行
     i = start_cycle
+    attempt = start_attempt
     try:
         while True:
             print('', flush=True)
-            print(f'Train {i} ====================================', flush=True)
+            print(f'Train {i} (Attempt {attempt}) ====================================', flush=True)
             
-            # 動的パラメータの取得
+            # 動的パラメータの取得（成功したサイクル数iを使用）
             pv_count = get_dynamic_pv_count(i)
             lr = get_dynamic_learning_rate(i)
             game_count = get_dynamic_game_count(i)
             
+            print(f'>> Successful Cycle: {i}', flush=True)
+            print(f'>> Total Attempts: {attempt}', flush=True)
             print(f'>> Game Count: {game_count}', flush=True)
             print(f'>> MCTS Simulations: {pv_count}', flush=True)
             print(f'>> Learning Rate: {lr}', flush=True)
@@ -110,25 +115,32 @@ if __name__ == '__main__':
             print(f'>> Train {i}', flush=True)
             train_network(learning_rate=lr)
 
-            # 新パラメータ評価部（100試合、常にモデル更新）
-            evaluate_network()
+            # 新パラメータ評価部（勝率55%以上で更新）
+            model_updated = evaluate_network()
 
             # ベストプレイヤーの評価（常に実行）
             evaluate_best_player()
             
-            # チェックポイント保存
+            # 試行回数をインクリメント
+            attempt += 1
+            
+            # モデルが更新された場合のみサイクル数をインクリメント
+            if model_updated:
+                i += 1
+                print(f'>> ✅ Cycle {i-1} SUCCESS! Model updated. Moving to cycle {i}.', flush=True)
+            else:
+                print(f'>> ⚠️ Attempt {attempt}: Model NOT updated. Retrying cycle {i}.', flush=True)
+            
+            # チェックポイント保存（サイクル数と試行回数の両方を保存）
             with open(checkpoint_file, 'w') as f:
-                json.dump({'cycle': i + 1}, f)
+                json.dump({'cycle': i, 'attempt': attempt}, f)
             
-            print(f'>> Cycle {i} completed. Checkpoint saved.', flush=True)
-            
-            # 次のサイクルへ
-            i += 1
+            print(f'>> Checkpoint saved (cycle: {i}, attempt: {attempt}).', flush=True)
             
     except KeyboardInterrupt:
         print('', flush=True)
-        print(f'>> Training interrupted at cycle {i}', flush=True)
+        print(f'>> Training interrupted at cycle {i} (attempt {attempt})', flush=True)
         print(f'>> Progress saved. Resume with: python train_cycle.py', flush=True)
-        # 現在のサイクル番号を保存
+        # 現在のサイクル番号と試行回数を保存
         with open(checkpoint_file, 'w') as f:
-            json.dump({'cycle': i}, f)
+            json.dump({'cycle': i, 'attempt': attempt}, f)

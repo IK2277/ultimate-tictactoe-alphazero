@@ -18,7 +18,7 @@ except ImportError:
     CPP_GAME_AVAILABLE = False
 
 # パラメータの準備
-EP_GAME_COUNT = 10  # 1評価あたりのゲーム数
+EP_GAME_COUNT = 100  # 1評価あたりのゲーム数（10→100に変更で信頼性向上）
 
 # 先手プレイヤーのポイント
 def first_player_point(ended_state):

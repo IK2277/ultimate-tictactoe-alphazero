@@ -94,16 +94,17 @@ def train_network(learning_rate=None):
         return -torch.sum(target * torch.log(pred + 1e-8)) / pred.size(0)
     
     criterion_value = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    # L2正則化（weight_decay）を追加して過学習を防止
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     
-    print(f'>> Learning Rate: {learning_rate}', flush=True)
+    print(f'>> Learning Rate: {learning_rate}, Weight Decay: 1e-4', flush=True)
 
-    # 学習率スケジューラ
+    # 学習率スケジューラ（緩和版: 停滞対策）
     def lr_lambda(epoch):
         if epoch >= 80:
-            return 0.25
+            return 0.5    # 0.25 → 0.5 に緩和（2倍の学習率を維持）
         elif epoch >= 50:
-            return 0.5
+            return 0.75   # 0.5 → 0.75 に緩和（1.5倍の学習率を維持）
         else:
             return 1.0
     

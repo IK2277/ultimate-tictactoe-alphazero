@@ -71,6 +71,9 @@ class DualNetwork(nn.Module):
         self.value_fc1 = nn.Linear(1 * 9 * 9, 256)
         self.value_fc2 = nn.Linear(256, 1)
         
+        # ドロップアウト層（過学習防止）
+        self.dropout = nn.Dropout(0.3)
+        
         # 重みの初期化
         self._initialize_weights()
         
@@ -104,6 +107,7 @@ class DualNetwork(nn.Module):
         p = F.relu(p)
         # 非連続メモリ対応で安全にフラット化
         p = torch.flatten(p, 1)
+        p = self.dropout(p)  # ドロップアウト適用
         p = self.policy_fc(p)
         p = F.softmax(p, dim=1)
         
@@ -115,6 +119,7 @@ class DualNetwork(nn.Module):
         v = torch.flatten(v, 1)
         v = self.value_fc1(v)
         v = F.relu(v)
+        v = self.dropout(v)  # ドロップアウト適用
         v = self.value_fc2(v)
         v = torch.tanh(v)
         

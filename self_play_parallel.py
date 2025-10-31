@@ -28,6 +28,21 @@ except ImportError:
 SP_GAME_COUNT = 500 # セルフプレイを行うゲーム数（本家は25000）
 SP_TEMPERATURE = 1.0 # ボルツマン分布の温度パラメータ
 
+# データの多様性向上のための温度スケジュール
+def get_temperature_for_move(move_count):
+    """
+    手番に応じて温度パラメータを動的に変更
+    序盤: 1.0 (多様性重視)
+    中盤: 0.8 (質と多様性のバランス)
+    終盤: 0.5 (最善手重視)
+    """
+    if move_count < 10:
+        return 1.0  # 序盤は多様性重視
+    elif move_count < 30:
+        return 0.8  # 中盤はバランス
+    else:
+        return 0.5  # 終盤は最善手重視
+
 # PV_EVALUATE_COUNTとMCTS_BATCH_SIZEをC++版に合わせる
 PV_EVALUATE_COUNT = 50
 
@@ -64,6 +79,7 @@ def play(model, use_cpp=True, pv_evaluate_count=None):
     
     # 学習データ
     history = []
+    move_count = 0  # 手数カウンター
 
     # C++バックエンドの使用判定
     if use_cpp and CPP_AVAILABLE:
@@ -88,11 +104,12 @@ def play(model, use_cpp=True, pv_evaluate_count=None):
         else:
             input_tensor = state_to_input_tensor(state)
 
-        # MCTSスコアの取得
+        # MCTSスコアの取得（動的温度パラメータを使用）
+        temperature = get_temperature_for_move(move_count)
         if use_cpp and CPP_AVAILABLE:
-            scores = pv_mcts_scores_cpp(model, state, SP_TEMPERATURE, pv_evaluate_count, MCTS_BATCH_SIZE)
+            scores = pv_mcts_scores_cpp(model, state, temperature, pv_evaluate_count, MCTS_BATCH_SIZE)
         else:
-            scores = pv_mcts_scores(model, state, SP_TEMPERATURE, pv_evaluate_count)
+            scores = pv_mcts_scores(model, state, temperature, pv_evaluate_count)
         
         # 合法手を取得
         legal_actions = state.legal_actions()
@@ -120,6 +137,7 @@ def play(model, use_cpp=True, pv_evaluate_count=None):
 
         # 次の状態の取得
         state = state.next(action)
+        move_count += 1  # 手数をインクリメント
 
     # 学習データに価値を追加
     value = -1 if state.is_lose() else 0 # 終局時の価値

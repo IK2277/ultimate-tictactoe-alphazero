@@ -15,8 +15,8 @@ print(f"ログファイル: {LOG_FILE}")
 print("Ctrl+C で中断できます")
 print()
 
-# ログファイルを開く
-with open(LOG_FILE, 'w', encoding='utf-8', buffering=1) as log_file:
+# ログファイルを開く（追記モード）
+with open(LOG_FILE, 'a', encoding='utf-8', buffering=1) as log_file:
     try:
         # train_cycle.pyを実行
         process = subprocess.Popen(

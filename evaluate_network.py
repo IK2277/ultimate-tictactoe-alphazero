@@ -96,10 +96,16 @@ def evaluate_network():
     del model0
     del model1
 
-    # ベストプレイヤーの更新（勝率に関係なく常に更新）
-    update_best_player()
-    print('>> Model updated (win rate: {:.1%})'.format(average_point), flush=True)
-    return True
+    # ベストプレイヤーの更新（勝率55%以上で更新）
+    UPDATE_THRESHOLD = 0.55  # 更新基準を厳格化
+    
+    if average_point >= UPDATE_THRESHOLD:
+        update_best_player()
+        print('>> Model updated! (win rate: {:.1%})'.format(average_point), flush=True)
+        return True
+    else:
+        print('>> Model NOT updated (win rate: {:.1%} < {:.1%} threshold)'.format(average_point, UPDATE_THRESHOLD), flush=True)
+        return False
 
 # 動作確認
 if __name__ == '__main__':
