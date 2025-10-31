@@ -126,10 +126,21 @@ def play(model, use_cpp=True, pv_evaluate_count=None):
             raise ValueError(f"Score size mismatch: scores={len(scores)}, legal_actions={len(legal_actions)}")
         
         scores = np.array(scores, dtype=np.float64)
-        if np.sum(scores) == 0:
+        
+        # NaN/Infチェックと修正
+        if np.any(np.isnan(scores)) or np.any(np.isinf(scores)):
+            # NaN/Infが含まれる場合は均等分布にフォールバック
+            scores = np.ones(len(scores)) / len(scores)
+        elif np.sum(scores) == 0 or np.sum(scores) < 1e-10:
+            # スコアの合計が0または極小の場合も均等分布
             scores = np.ones(len(scores)) / len(scores)
         else:
+            # 正常なスコアを正規化
             scores = scores / np.sum(scores)
+        
+        # 正規化後の最終チェック（念のため）
+        if np.any(np.isnan(scores)):
+            scores = np.ones(len(scores)) / len(scores)
         
         # 方策を81次元ベクトルに変換
         policy = np.zeros(81)

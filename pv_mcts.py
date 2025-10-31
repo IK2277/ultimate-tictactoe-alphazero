@@ -201,13 +201,66 @@ def pv_mcts_scores(model, state, temperature, pv_evaluate_count=None):
 def pv_mcts_action(model, temperature=0, pv_evaluate_count=None):
     def pv_mcts_action(state):
         scores = pv_mcts_scores(model, state, temperature, pv_evaluate_count)
-        return np.random.choice(state.legal_actions(), p=scores)
+        
+        # 安全性チェック
+        scores = np.array(scores, dtype=np.float64)
+        legal_actions = state.legal_actions()
+        
+        if np.any(np.isnan(scores)) or np.any(np.isinf(scores)) or np.sum(scores) < 1e-10:
+            # 異常な場合は均等分布
+            scores = np.ones(len(scores)) / len(scores)
+        else:
+            # 正規化（念のため）
+            scores = scores / np.sum(scores)
+        
+        return np.random.choice(legal_actions, p=scores)
     return pv_mcts_action
 
 # ボルツマン分布
 def boltzman(xs, temperature):
-    xs = [x ** (1 / temperature) for x in xs]
-    return [x / sum(xs) for x in xs]
+    """
+    ボルツマン分布を適用
+    温度が極小の場合のオーバーフロー対策を含む
+    """
+    if temperature < 1e-8:
+        # 温度が極小の場合は決定論的（最大値のみ1）
+        max_idx = np.argmax(xs)
+        result = np.zeros(len(xs))
+        result[max_idx] = 1.0
+        return result.tolist()
+    
+    try:
+        # 数値安定性のため、log-sum-exp トリックを使用
+        xs = np.array(xs, dtype=np.float64)
+        
+        # x^(1/T) = exp((1/T) * log(x))
+        # 0除算を避けるため、最小値を設定
+        xs = np.maximum(xs, 1e-10)
+        log_xs = np.log(xs) / temperature
+        
+        # オーバーフロー対策: 最大値を引く
+        log_xs_max = np.max(log_xs)
+        log_xs = log_xs - log_xs_max
+        
+        # exp を取る
+        exp_xs = np.exp(log_xs)
+        
+        # 正規化
+        sum_exp = np.sum(exp_xs)
+        if sum_exp < 1e-10 or np.isnan(sum_exp) or np.isinf(sum_exp):
+            # 異常な場合は均等分布
+            return (np.ones(len(xs)) / len(xs)).tolist()
+        
+        result = exp_xs / sum_exp
+        
+        # NaN/Infチェック
+        if np.any(np.isnan(result)) or np.any(np.isinf(result)):
+            return (np.ones(len(xs)) / len(xs)).tolist()
+        
+        return result.tolist()
+    except:
+        # エラーが発生した場合は均等分布
+        return (np.ones(len(xs)) / len(xs)).tolist()
 
 # 動作確認
 if __name__ == '__main__':

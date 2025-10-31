@@ -125,12 +125,19 @@ def pv_mcts_action_cpp(model, temperature=0, evaluate_count=50, batch_size=8):
         if len(scores) != len(legal_actions):
             raise ValueError(f"Score size mismatch: scores={len(scores)}, legal_actions={len(legal_actions)}")
         
-        # スコアの合計が0の場合は均等分布にする
-        if np.sum(scores) == 0:
+        scores = np.array(scores, dtype=np.float64)
+        
+        # NaN/Infチェックと修正
+        if np.any(np.isnan(scores)) or np.any(np.isinf(scores)):
+            scores = np.ones(len(scores)) / len(scores)
+        elif np.sum(scores) == 0 or np.sum(scores) < 1e-10:
             scores = np.ones(len(scores)) / len(scores)
         else:
-            # 正規化
             scores = scores / np.sum(scores)
+        
+        # 正規化後の最終チェック
+        if np.any(np.isnan(scores)):
+            scores = np.ones(len(scores)) / len(scores)
         
         return np.random.choice(legal_actions, p=scores)
     
