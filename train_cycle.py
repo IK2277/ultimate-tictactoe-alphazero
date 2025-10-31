@@ -124,9 +124,9 @@ if __name__ == '__main__':
             # モデルが更新された場合のみサイクル数をインクリメント
             if model_updated:
                 i += 1
-                print(f'>> ✅ Cycle {i-1} SUCCESS! Model updated. Moving to cycle {i}.', flush=True)
+                print(f'>> [SUCCESS] Cycle {i-1} completed! Model updated. Moving to cycle {i}.', flush=True)
             else:
-                print(f'>> ⚠️ Attempt {attempt}: Model NOT updated. Retrying cycle {i}.', flush=True)
+                print(f'>> [RETRY] Attempt {attempt}: Model NOT updated. Retrying cycle {i}.', flush=True)
             
             # 試行回数をインクリメント（評価後）
             attempt += 1
