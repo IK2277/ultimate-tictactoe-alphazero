@@ -20,7 +20,7 @@ except ImportError:
 
 # パラメータの準備
 EN_GAME_COUNT = 100 # 1評価あたりのゲーム数（50→100に変更）
-EN_TEMPERATURE = 1.0 # ボルツマン分布の温度
+EN_TEMPERATURE = 0.0 # AlphaZero準拠: 評価時は決定論的（最善手のみ選択）
 
 # 先手プレイヤーのポイント
 def first_player_point(ended_state):

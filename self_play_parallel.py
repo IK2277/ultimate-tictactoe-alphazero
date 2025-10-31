@@ -28,20 +28,27 @@ except ImportError:
 SP_GAME_COUNT = 500 # セルフプレイを行うゲーム数（本家は25000）
 SP_TEMPERATURE = 1.0 # ボルツマン分布の温度パラメータ
 
-# データの多様性向上のための温度スケジュール
+# データの多様性向上のための温度スケジュール（AlphaZero準拠）
 def get_temperature_for_move(move_count):
     """
     手番に応じて温度パラメータを動的に変更
-    序盤: 1.0 (多様性重視)
-    中盤: 0.8 (質と多様性のバランス)
-    終盤: 0.5 (最善手重視)
+    AlphaZero/AlphaGo Zero準拠の設定:
+    - 最初の30手: τ = 1.0 (探索促進、多様性確保)
+    - 30手以降: τ → 0 (最善手選択、決定論的)
+    
+    参考:
+    - AlphaGo Zero/AlphaZero: 最初の30ムーブでτ=1、以降τ→0
+    - KataGo: τ=0.8から0.2へ滑らかに減衰（半減期=ボード幅）
+    - ELF OpenGo: すべてのムーブでτ=1（多様性重視）
+    
+    Ultimate Tic-Tac-Toe用の調整:
+    - 手数0-29: τ = 1.0 (AlphaZero標準、探索促進)
+    - 手数30+: τ → 0 (実質的には極小値0.01、最善手重視)
     """
-    if move_count < 10:
-        return 1.0  # 序盤は多様性重視
-    elif move_count < 30:
-        return 0.8  # 中盤はバランス
+    if move_count < 30:
+        return 1.0  # AlphaZero標準: 最初の30手は多様性重視
     else:
-        return 0.5  # 終盤は最善手重視
+        return 0.01  # AlphaZero標準: 30手以降は決定論的（τ→0）
 
 # PV_EVALUATE_COUNTとMCTS_BATCH_SIZEをC++版に合わせる
 PV_EVALUATE_COUNT = 50
