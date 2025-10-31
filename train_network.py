@@ -17,23 +17,32 @@ RN_EPOCHS = 100 # 学習回数
 BATCH_SIZE = 128
 NUM_WORKERS = 0  # Windowsではマルチプロセッシングの問題を避けるため0に設定
 
-# 動的な学習率を取得する関数
+# 動的な学習率を取得する関数（AlphaZero準拠）
 def get_dynamic_learning_rate(cycle):
     """
     サイクル数に応じて学習率を動的に変更
-    cycle 0-9: 0.001 (初期学習)
-    cycle 10-19: 0.0005 (中期学習)
-    cycle 20-29: 0.0002 (後期学習)
-    cycle 30+: 0.0001 (微調整)
+    AlphaZero系の知見を参考に、高めの初期学習率から段階的に減衰
+    
+    参考:
+    - AlphaGo Zero: 1e-2 → 1e-3 → 1e-4 (40万, 60万ステップ)
+    - AlphaZero: 2e-2 → 2e-3 → 2e-4 (30万, 50万ステップ)
+    - OLIVAW (オセロ): 5e-3 → 1e-3 → 1e-4 (第4, 11世代)
+    - KataGo: 6e-5/sample (バッチ256で約1.5e-2/batch)
+    
+    Ultimate Tic-Tac-Toe用の調整:
+    - cycle 0-9: 0.005 (初期学習、OLIVAW準拠)
+    - cycle 10-19: 0.001 (中期学習、安定化)
+    - cycle 20-29: 0.0002 (後期学習、微調整)
+    - cycle 30+: 0.0001 (収束期、精密化)
     """
     if cycle < 10:
-        return 0.001
+        return 0.005  # 5倍に増加（従来0.001 → 0.005）
     elif cycle < 20:
-        return 0.0005
+        return 0.001  # 従来0.0005 → 0.001（2倍）
     elif cycle < 30:
-        return 0.0002
+        return 0.0002  # 維持
     else:
-        return 0.0001
+        return 0.0001  # 維持
 
 # 学習データの読み込み
 def load_data():
@@ -94,21 +103,35 @@ def train_network(learning_rate=None):
         return -torch.sum(target * torch.log(pred + 1e-8)) / pred.size(0)
     
     criterion_value = nn.MSELoss()
-    # L2正則化（weight_decay）を追加して過学習を防止
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     
+    # AlphaZero準拠: SGD + Momentum 0.9 + L2正則化
+    # 参考: AlphaGo Zero, AlphaZero, Minigoなど全てSGD + Momentum 0.9を使用
+    # L2正則化（weight_decay=1e-4）は損失関数に組み込まれていた
+    optimizer = optim.SGD(
+        model.parameters(), 
+        lr=learning_rate, 
+        momentum=0.9,
+        weight_decay=1e-4,
+        nesterov=False  # AlphaZeroは標準SGD
+    )
+    
+    print(f'>> Optimizer: SGD (Momentum 0.9, AlphaZero-style)', flush=True)
     print(f'>> Learning Rate: {learning_rate}, Weight Decay: 1e-4', flush=True)
 
-    # 学習率スケジューラ（緩和版: 停滞対策）
+    # 学習率スケジューラ（AlphaZero準拠: より緩やかな減衰）
+    # AlphaZeroでは数十万ステップで減衰
+    # 100エポック × 約230バッチ = 約23,000ステップ
+    # → エポック70, 90で減衰（AlphaZeroの比率を維持）
     def lr_lambda(epoch):
-        if epoch >= 80:
-            return 0.5    # 0.25 → 0.5 に緩和（2倍の学習率を維持）
-        elif epoch >= 50:
-            return 0.75   # 0.5 → 0.75 に緩和（1.5倍の学習率を維持）
+        if epoch >= 90:
+            return 0.1    # 最終段階: 1/10に減衰
+        elif epoch >= 70:
+            return 0.2    # 後期: 1/5に減衰
         else:
-            return 1.0
+            return 1.0    # 初期・中期: フル学習率を維持
     
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
+    print(f'>> LR Schedule: Epoch 70 (×0.2), Epoch 90 (×0.1)', flush=True)
 
     # 学習の実行
     model.train()
